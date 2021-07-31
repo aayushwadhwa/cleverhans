@@ -3,15 +3,22 @@ import numpy as np
 import tensorflow as tf
 from cleverhans.tf2.utils import compute_gradient
 
-# My Implementation
 def deep_fool_attack(model, input_img_batch, num_classes=10, overshoot=0.02, max_itr=50):
+  """
+  Deepfool attack (https://arxiv.org/pdf/1511.04599.pdf), proposed by 
+  
+  :param model: any NN that produces result before apply softmax
+  :param input_img_batch: batch of all the input images
+  :param num_classes: number of classes to check while producing attack image
+  :param max_iter: maximum number of iterations for deepfool (default = 50)
+  :return: perturbed image and minimal perturbation that fools the classifier
 
-  # getting top 10 labels of each image in the batch and storing it as numpy array
+  """
+
   f_batch = model(input_img_batch).numpy()
   f_batch_labels = np.argsort(-f_batch)[:,:num_classes]
   labels = f_batch_labels[:, :1].flatten()
 
-  # Copy input image and initialize w and r
   input_shape = input_img_batch.shape
   pert_image_batch = copy.deepcopy(input_img_batch)
   backup = copy.deepcopy(input_img_batch)
@@ -26,35 +33,19 @@ def deep_fool_attack(model, input_img_batch, num_classes=10, overshoot=0.02, max
   x = tf.expand_dims(x, axis=0)
   fs = model(x)
 
-#   def loss_func(logits, I, k):
-#     return logits[0, I[k]]
-
   def loss_func(labels, logits):
       return logits[0, labels]
     
     
-  # Start loop for each image and change its label
   while i < input_shape[0]:
     x = tf.Variable(backup[i])
     while k[i] == labels[i] and itr < max_itr:
       x = tf.expand_dims(x, axis=0)
 
       pert = np.inf
-    #   with tf.GradientTape() as tape:
-    #     tape.watch(x)
-    #     fs = model(x)
-    #     loss_value = loss_func(fs, f_batch_labels[i], 0)
-      
-    #   grad_orig = tape.gradient(loss_value, x)
-
       grad_orig = compute_gradient(model, loss_func, x, f_batch_labels[i][0], False)
 
       for j in range(1, num_classes):
-        # with tf.GradientTape() as tape:
-        #   tape.watch(x)
-        #   fs = model(x)
-        #   loss_value = loss_func(fs, f_batch_labels[i], j)
-        # curr_grad = tape.gradient(loss_value, x)
         curr_grad = compute_gradient(model, loss_func, x, f_batch_labels[i][j], False)
         
         w_k = curr_grad - grad_orig
